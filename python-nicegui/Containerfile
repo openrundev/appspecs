@@ -13,7 +13,7 @@ WORKDIR /app
 COPY requirements.txt ./
 
 RUN pip3 install -r requirements.txt
-RUN pip3 install nicegui itsdangerous isort docutils requests latex2mathml setuptools
+RUN pip3 install nicegui itsdangerous isort docutils requests latex2mathml setuptools matplotlib
 
 EXPOSE 8080
 
