@@ -1,0 +1,16 @@
+# From https://raw.githubusercontent.com/reflex-dev/reflex/refs/heads/main/docker-example/production-one-port/Caddyfile
+
+:8080
+
+encode gzip
+
+@backend_routes path /_event/* /ping /_upload /_upload/*
+handle @backend_routes {
+	reverse_proxy localhost:8000
+}
+
+root * /srv
+route {
+	try_files {path} {path}/ /404.html
+	file_server
+}
