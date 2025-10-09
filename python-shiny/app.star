@@ -7,7 +7,6 @@ app = ace.app(param.app_name,
               ],
               container=container.config(
                   container.AUTO, port=param.port,
-                  volumes=["cl_secret:./secrets.toml.tmpl:/app/.streamlit/secrets.toml"]
               ),
               permissions=[
                   ace.permission("proxy.in", "config", [container.URL]),
