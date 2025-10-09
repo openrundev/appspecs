@@ -1,0 +1,32 @@
+# Use an official Python runtime as a parent image
+ARG PYTHON_VERSION=3.12.3
+FROM python:${PYTHON_VERSION}
+
+ARG REQUIREMENTS_FILE=requirements.txt
+
+# Set environment variables to prevent Python from writing pyc files to disc and buffer output
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Create app directory
+WORKDIR /app
+
+# Install app dependencies
+COPY ${REQUIREMENTS_FILE} /app/requirements.txt
+
+EXPOSE 8000
+
+# Bundle app source
+COPY . /app
+
+RUN pip3 install -r requirements.txt
+RUN pip3 install shiny
+
+
+RUN cat <<EOF > /shiny_run_cmd.sh
+
+set -euo pipefail
+shiny run --host 0.0.0.0 --port 8000 \$app_file
+EOF
+
+CMD ["bash", "-x", "/shiny_run_cmd.sh"]
