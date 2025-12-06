@@ -19,13 +19,8 @@ EXPOSE 8501
 
 # Bundle app source
 COPY . /app
+COPY streamlit_cmd.sh /streamlit_cmd.sh
+RUN chmod +x /streamlit_cmd.sh
 
-RUN cat <<EOF > /streamlit_cmd.sh
-run_args="run \$app_file"
-if [[ "\$app_file" = "hello" ]]; then
-    run_args="hello"
-fi
-streamlit \$run_args --server.address=0.0.0.0 --server.baseUrlPath=\$CL_APP_PATH
-EOF
 
 CMD ["bash", "-x", "/streamlit_cmd.sh"]
