@@ -23,10 +23,7 @@ RUN pip3 install -r requirements.txt
 RUN pip3 install shiny
 
 
-RUN cat <<EOF > /shiny_run_cmd.sh
-
-set -euo pipefail
-shiny run --host 0.0.0.0 --port 8000 \$app_file
-EOF
+COPY shiny_run_cmd.sh /shiny_run_cmd.sh
+RUN chmod +x /shiny_run_cmd.sh
 
 CMD ["bash", "-x", "/shiny_run_cmd.sh"]

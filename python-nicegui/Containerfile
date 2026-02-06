@@ -19,9 +19,7 @@ EXPOSE 8080
 
 # Bundle app source
 COPY . /app
-
-RUN cat <<EOF > /fastgui_cmd.sh
-python \$app_file
-EOF
+COPY fastgui_cmd.sh /fastgui_cmd.sh
+RUN chmod +x /fastgui_cmd.sh
 
 CMD ["bash", "-x", "/fastgui_cmd.sh"]

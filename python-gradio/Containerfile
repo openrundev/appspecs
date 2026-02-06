@@ -28,13 +28,9 @@ RUN pip3 install -r requirements.txt
 
 # Bundle app source
 COPY --chown=appuser:appuser . /app
+COPY --chown=appuser:appuser gradio_cmd.sh /tmp/gradio_cmd.sh
+RUN chmod +x /tmp/gradio_cmd.sh
 
 EXPOSE 7860
-
-RUN cat <<EOF > /tmp/gradio_cmd.sh
-export GRADIO_ROOT_PATH=\$CL_APP_PATH
-export GRADIO_SERVER_NAME=0.0.0.0
-python \$app_file
-EOF
 
 CMD ["bash", "-x", "/tmp/gradio_cmd.sh"]

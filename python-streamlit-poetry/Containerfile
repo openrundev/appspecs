@@ -19,12 +19,7 @@ COPY . /app
 
 RUN /opt/poetry/bin/poetry install
 
-RUN cat <<EOF > /streamlit_cmd.sh
-run_args="run \$app_file"
-if [[ "\$app_file" = "hello" ]]; then
-    run_args="hello"
-fi
-/opt/poetry/bin/poetry run streamlit \$run_args --server.address=0.0.0.0 --server.baseUrlPath=\$CL_APP_PATH
-EOF
+COPY streamlit_cmd.sh /streamlit_cmd.sh
+RUN chmod +x /streamlit_cmd.sh
 
 CMD ["bash", "-x", "/streamlit_cmd.sh"]
