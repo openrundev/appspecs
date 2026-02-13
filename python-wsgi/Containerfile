@@ -1,42 +1,79 @@
-# Use an official Python runtime as a parent image
-ARG PYTHON_VERSION=3.12.5-slim
-FROM python:${PYTHON_VERSION}
+# syntax=docker/dockerfile:1.7
 
-# Set environment variables to prevent Python from writing pyc files to disc and buffer output
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+# First, build the application in the `/app` directory.
+# See `Dockerfile` for details.
+ARG PYTHON_VERSION=3.14
+ARG BUILDER_IMAGE=ghcr.io/astral-sh/uv:python${PYTHON_VERSION}-bookworm-slim
+ARG RUN_IMAGE=python:${PYTHON_VERSION}-slim-bookworm
 
-# Create a non-root user and group
-RUN groupadd --gid 1000 appuser && \
-    useradd --uid 1000 --gid appuser --shell /bin/bash --create-home appuser
+FROM ${BUILDER_IMAGE} AS builder
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 
-# Set working directory
+# Omit development dependencies
+ENV UV_NO_DEV=1
+
+# Disable Python downloads, because we want to use the system interpreter
+# across both images. If using a managed Python version, it needs to be
+# copied from the build image into the final image; see `standalone.Dockerfile`
+# for an example.
+ENV UV_PYTHON_DOWNLOADS=0
+
 WORKDIR /app
 
-# Change ownership of the app directory to the non-root user
-RUN chown -R appuser:appuser /app
+# Copy dependency manifests first to maximize cache reuse.
+# Wildcards make uv.lock/requirements.txt optional while still supporting either flow.
+COPY pyproject.toml* uv.lock* requirements.txt* /app/
 
-# Switch to the non-root user
-USER appuser
+RUN --mount=type=cache,target=/root/.cache/uv \
+    set -eux; \
+    if [ -f uv.lock ]; then \
+        [ -f pyproject.toml ] || (echo "uv.lock found but pyproject.toml is missing" >&2; exit 1); \
+        uv sync --locked --no-install-project; \
+    elif [ -f requirements.txt ]; then \
+        uv venv /app/.venv; \
+        uv pip install --python /app/.venv/bin/python --requirement requirements.txt; \
+        uv pip install --python /app/.venv/bin/python gunicorn; \
+    else \
+        echo "Neither uv.lock nor requirements.txt found in build context" >&2; \
+        exit 1; \
+    fi
 
-# Install Gunicorn
-RUN pip install --no-cache-dir gunicorn
+COPY . /app
+RUN --mount=type=cache,target=/root/.cache/uv \
+    set -eux; \
+    if [ -f uv.lock ]; then \
+        uv sync --locked; \
+    fi
 
-# Install dependencies
-COPY --chown=appuser:appuser requirements.txt /app/
-RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the current directory contents into the container at /app
-COPY --chown=appuser:appuser . /app/
+# Then, use a final image without uv
+FROM ${RUN_IMAGE}
+# It is important to use the image that matches the builder, as the path to the
+# Python executable must be the same, e.g., using `python:3.13-slim-bookworm`
+# will fail.
 
-# Expose the port on which the app runs
+# Setup a non-root user
+RUN groupadd --system --gid 999 nonroot \
+ && useradd --system --gid 999 --uid 999 --create-home nonroot
+
 EXPOSE 8000
+
+# Copy the application from the builder
+COPY --from=builder --chown=nonroot:nonroot /app /app
+
+# Place executables in the environment at the front of the path
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Set default values for workers and threads (can be overridden at runtime)
 ENV WORKERS=2
 ENV THREADS=4
 ENV APP_MODULE=app:app
 
-# Run the application with Gunicorn
-CMD /home/appuser/.local/bin/gunicorn --bind 0.0.0.0:8000 --workers $WORKERS --threads $THREADS --env "SCRIPT_NAME=$CL_APP_PATH" $APP_MODULE 
+# Use the non-root user to run our application
+USER nonroot
 
+# Use `/app` as the working directory
+WORKDIR /app
+
+# Run the application with Gunicorn
+CMD gunicorn --bind 0.0.0.0:8000 --workers $WORKERS --threads $THREADS --env "SCRIPT_NAME=$CL_APP_PATH" $APP_MODULE
