@@ -1,0 +1,66 @@
+# syntax=docker/dockerfile:1.7
+
+FROM node:22-alpine AS builder
+WORKDIR /app
+
+ENV NODE_ENV=development
+
+COPY package*.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    if [ -f package-lock.json ]; then \
+        npm ci; \
+    else \
+        npm install; \
+    fi
+
+COPY . .
+RUN --mount=type=cache,target=/root/.npm \
+    if node -e "process.exit(require('./package.json').scripts?.build ? 0 : 1)"; then \
+        npm run build; \
+    fi; \
+    if ! node -e "process.exit(require('./package.json').scripts?.start ? 0 : 1)"; then \
+        npm install --save @hono/node-server; \
+        npm install --save-dev esbuild; \
+        entry=src/index.tsx; \
+        if [ ! -f "$entry" ] && [ -f src/index.ts ]; then entry=src/index.ts; fi; \
+        if [ ! -f "$entry" ] && [ -f src/index.jsx ]; then entry=src/index.jsx; fi; \
+        if [ ! -f "$entry" ] && [ -f src/index.js ]; then entry=src/index.js; fi; \
+        if [ ! -f "$entry" ]; then \
+            echo "No npm start script and no src/index.tsx, src/index.ts, src/index.jsx, or src/index.js found" >&2; \
+            exit 1; \
+        fi; \
+        mkdir -p .openrun-hono dist; \
+        printf '%s\n' \
+            "import { serve } from '@hono/node-server'" \
+            "import app from '../${entry}'" \
+            "" \
+            "const port = Number(process.env.PORT || 3000)" \
+            "const hostname = process.env.HOST || process.env.HOSTNAME || '0.0.0.0'" \
+            "serve({ fetch: app.fetch, port, hostname }, (info) => {" \
+            "  console.log(\`Hono server listening on http://\${info.address}:\${info.port}\`)" \
+            "})" \
+            > .openrun-hono/server-entry.ts; \
+        npx esbuild .openrun-hono/server-entry.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/openrun-server.mjs; \
+    fi
+RUN npm prune --omit=dev
+
+FROM node:22-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOST=0.0.0.0
+ENV HOSTNAME=0.0.0.0
+
+RUN apk add --no-cache tini
+
+COPY --from=builder --chown=node:node /app /app
+COPY --chown=node:node hono_start.sh /usr/local/bin/hono_start.sh
+RUN chmod +x /usr/local/bin/hono_start.sh
+
+USER node
+
+EXPOSE 3000
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["hono_start.sh"]
