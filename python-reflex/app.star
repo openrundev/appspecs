@@ -9,8 +9,9 @@ app = ace.app(param.app_name,
                   container.AUTO, port=param.port, health="/ping",
                   cargs={"API_URL": ace.config("_app_url", "")}
               ),
+              settings={"container": {"separate_stage_prod_images": True}},
               permissions=[
                   ace.permission("proxy.in", "config", [container.URL]),
                   ace.permission("container.in", "config", [container.AUTO], secrets=param.secrets)
               ]
-       ) 
+       )
