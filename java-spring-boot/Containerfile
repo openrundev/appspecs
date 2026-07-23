@@ -1,0 +1,38 @@
+ARG JAVA_VERSION=21
+
+######################################
+# STEP 1: Resolve maven dependencies #
+######################################
+
+# Dev mode runs in this stage (dev_settings target), with the app source
+# bind mounted, so it needs the toolchain and dependencies but not the jar
+FROM maven:3-eclipse-temurin-${JAVA_VERSION} AS deps
+
+WORKDIR /app
+
+# Resolve dependencies first so they are cached as an image layer
+COPY pom.xml ./
+RUN mvn -q -B dependency:go-offline
+
+##############################
+# STEP 2: Build the Java app #
+##############################
+
+FROM deps AS build
+
+# Copy the source and build the application jar
+COPY . .
+RUN mvn -q -B package -DskipTests
+
+##############################
+# STEP 3: Create final image #
+##############################
+
+FROM eclipse-temurin:${JAVA_VERSION}-jre
+
+WORKDIR /app
+
+COPY --from=build /app/target/*.jar /app/app.jar
+
+# PORT env is set by OpenRun to the configured app port
+CMD ["sh", "-c", "java -jar /app/app.jar --server.port=${PORT}"]

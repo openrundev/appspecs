@@ -3,20 +3,20 @@ load("container.in", "container")
 
 app = ace.app(param.app_name,
               routes=[
-                  ace.proxy("/", proxy.config(container.URL, strip_app=True))
+                  ace.proxy("/", proxy.config(container.URL, preserve_host=param.preserve_host))
               ],
-              container=container.config(
-                  container.AUTO, port=param.port, health="/",
+              container=container.config(container.AUTO, port=param.port,
+                                         cargs={"JAVA_VERSION": param.java_version},
                                          dev_settings={
-                                             "target": "builder",
+                                             "target": "deps",
                                              "command": param.dev_command,
                                              "dir": "/app",
                                              "reload": param.dev_reload,
-                                             "additional_mounts": ["venv:/app/.venv", "uv-cache:/root/.cache/uv"],
-                                         }
-                                         ),
+                                             "env_files": ["pom.xml"],
+                                             "additional_mounts": ["m2-cache:/root/.m2"],
+                                         }),
               permissions=[
                   ace.permission("proxy.in", "config", [container.URL]),
                   ace.permission("container.in", "config", [container.AUTO], secrets=param.secrets)
               ]
-       ) 
+       )
