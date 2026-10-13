@@ -5,7 +5,7 @@ param("app_name", description="The name for the app", default="Go App")
 
 param("preserve_host", type=BOOLEAN, description="Whether to preserve the original Host header", default=False)
 
-param("secrets", description="The secrets which are allowed to be passed to the container", type=LIST, default=[["regex:.*"]])
+param("secrets", description="The secrets which are allowed to be passed to the container, e.g. [[\"regex:.*\"]] for all secrets. Setting this declares secret access, which needs the app to be approved", type=LIST, default=[])
 
 param("dev_command",
       description="The command used to start the app in dev mode, run in the builder stage with the app source mounted",
