@@ -9,7 +9,7 @@ param("secrets", description="The secrets which are allowed to be passed to the 
 
 param("dev_command",
       description="The command used to start the app in dev mode, run with the app source mounted",
-      default="""export PATH=/app/.venv/bin:$PATH; if [ -f uv.lock ]; then uv sync --locked; elif [ -f requirements.txt ]; then [ -d .venv ] || uv venv .venv; uv pip install -q -r requirements.txt; fi; python -c 'import watchdog' 2>/dev/null || uv pip install -q watchdog; exec python -m flask run --host=0.0.0.0 --reload""")
+      default="""export PATH=/app/.venv/bin:$PATH; if [ -f uv.lock ]; then uv sync --locked; elif [ -f requirements.txt ]; then [ -d .venv ] || uv venv .venv; uv pip install -q -r requirements.txt; fi; uv pip install -q 'watchdog<7'; exec python -m flask run --host=0.0.0.0 --reload""")
 
 param("dev_reload",
       description="What a source change does in dev mode: none (the flask --reload file watcher reloads on its own, the default), restart (restart container) or recreate",
