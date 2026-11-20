@@ -1,0 +1,47 @@
+# syntax=docker/dockerfile:1.7
+
+# r2u provides CRAN packages as Ubuntu binaries (amd64 and arm64), so
+# install.packages() pulls prebuilt packages with their system libraries
+# through apt instead of compiling from source.
+ARG BASE_IMAGE=rocker/r2u:24.04
+
+FROM ${BASE_IMAGE} AS builder
+
+RUN install.r shiny renv
+
+WORKDIR /app
+
+# With an renv.lock, restore the pinned packages first to maximize cache
+# reuse. The wildcard makes the lockfile optional.
+COPY shiny_install_deps.R renv.lock* /app/
+RUN Rscript shiny_install_deps.R lockfile
+
+# Without an renv.lock, install the packages which the app source uses
+COPY . /app
+RUN Rscript shiny_install_deps.R
+
+
+FROM builder
+
+# Packages are installed at build time. Turn off the apt based package
+# installer for the runtime image, it cannot be used by a non-root user
+RUN sed -i '/bspm/d' /etc/R/Rprofile.site
+
+# Setup a non-root user
+RUN groupadd --system --gid 999 nonroot \
+ && useradd --system --gid 999 --uid 999 --create-home nonroot \
+ && chown -R nonroot:nonroot /app
+
+EXPOSE 3838
+
+# The packages are installed in the system library; do not let a project
+# .Rprofile switch to an renv project library at startup
+ENV RENV_CONFIG_AUTOLOADER_ENABLED=FALSE
+
+# Use the non-root user to run our application
+USER nonroot
+
+WORKDIR /app
+
+# Run the application
+CMD ["bash", "-x", "/app/shiny_run_cmd.sh"]
